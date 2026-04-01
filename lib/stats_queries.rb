@@ -38,7 +38,8 @@ module StatsQueries
       by_assignee: by_assignee,
       monthly_trend: monthly_trend,
       by_day_of_week: by_day_of_week,
-      oldest_open: oldest_open
+      oldest_open: oldest_open,
+      high_conversation: high_conversation
     }
   end
 
@@ -58,7 +59,8 @@ module StatsQueries
       by_assignee: by_assignee(w),
       monthly_trend: monthly_trend(w),
       by_day_of_week: by_day_of_week(w),
-      oldest_open: oldest_open(w)
+      oldest_open: oldest_open(w),
+      high_conversation: high_conversation(w)
     }
   end
 
@@ -198,5 +200,51 @@ module StatsQueries
       " WHERE s.is_closed = 0 AND #{where}" \
       " ORDER BY i.created_on ASC LIMIT 10"
     ).to_a
+  end
+
+  def high_conversation(where = "1=1")
+    # Calculate average updates for the scoped tickets
+    avg_row = db.select_one(
+      "SELECT ROUND(AVG(j_count), 1) AS avg_updates," \
+      " ROUND(AVG(j_count) + STDDEV(j_count), 1) AS threshold" \
+      " FROM (" \
+      "   SELECT i.id, COUNT(j.id) AS j_count" \
+      "   FROM issues i" \
+      "   JOIN issue_statuses s ON i.status_id = s.id" \
+      "   LEFT JOIN journals j ON j.journalized_id = i.id AND j.journalized_type = 'Issue'" \
+      "   WHERE s.is_closed = 0 AND #{where}" \
+      "   GROUP BY i.id" \
+      " ) sub"
+    )
+    threshold = (avg_row["threshold"] || 1).to_f
+    threshold = 2.0 if threshold < 2.0  # minimum threshold of 2 updates
+
+    tickets = db.select_all(
+      "SELECT i.id, p.name AS project, t.name AS tracker," \
+      " i.subject, s.name AS status," \
+      " COUNT(j.id) AS updates," \
+      " COALESCE(CONCAT(u.firstname, ' ', u.lastname), 'Unassigned') AS assignee," \
+      " DATEDIFF(NOW(), i.created_on) AS age_days," \
+      " DATE(i.created_on) AS created," \
+      " DATE(MAX(j.created_on)) AS last_update" \
+      " FROM issues i" \
+      " JOIN projects p ON i.project_id = p.id" \
+      " JOIN trackers t ON i.tracker_id = t.id" \
+      " JOIN issue_statuses s ON i.status_id = s.id" \
+      " LEFT JOIN users u ON i.assigned_to_id = u.id" \
+      " LEFT JOIN journals j ON j.journalized_id = i.id AND j.journalized_type = 'Issue'" \
+      " WHERE s.is_closed = 0 AND #{where}" \
+      " GROUP BY i.id" \
+      " HAVING updates >= #{threshold}" \
+      " ORDER BY updates DESC" \
+      " LIMIT 20"
+    ).to_a
+
+    {
+      avg_updates: avg_row["avg_updates"],
+      threshold: threshold,
+      count: tickets.size,
+      tickets: tickets
+    }
   end
 end

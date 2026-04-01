@@ -171,6 +171,35 @@
   </div>
 </div>
 
+<% hc = @stats[:high_conversation] || @stats["high_conversation"] || {} %>
+<% hc_tickets = hc["tickets"] || [] %>
+<% if hc_tickets.any? %>
+<div class="stats-grid">
+  <div class="stats-panel stats-full">
+    <h3>High Conversation Tickets (open, &ge; <%= hc["threshold"] %> updates, avg: <%= hc["avg_updates"] %>)</h3>
+    <table>
+      <tr>
+        <th>ID</th><th>Tracker</th><th>Subject</th><th>Status</th>
+        <th>Assignee</th><th class="stats-num">Updates</th>
+        <th class="stats-num">Age</th><th>Last Update</th>
+      </tr>
+      <% hc_tickets.each do |r| %>
+      <tr>
+        <td><%= link_to "##{r['id']}", issue_path(r['id']) %></td>
+        <td><%= r["tracker"] %></td>
+        <td><%= truncate(r["subject"].to_s, length: 55) %></td>
+        <td><%= r["status"] %></td>
+        <td><%= r["assignee"] %></td>
+        <td class="stats-num"><strong><%= r["updates"] %></strong></td>
+        <td class="stats-num"><%= number_with_delimiter(r["age_days"]) %>d</td>
+        <td><%= r["last_update"] %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+</div>
+<% end %>
+
 <div class="stats-meta">
   Generated: <%= @stats[:generated_at] || @stats["generated_at"] %> &mdash;
   Cached for <%= (@stats[:cache_ttl_seconds] || @stats["cache_ttl_seconds"]).to_i / 3600 %> hours
