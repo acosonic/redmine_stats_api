@@ -203,23 +203,37 @@
 <% stale = @stats[:stale_tickets] || @stats["stale_tickets"] || {} %>
 <% stale_summary = stale["summary"] || {} %>
 <% stale_tickets = stale["tickets"] || [] %>
+<%
+  stale_url = lambda { |days|
+    date = (Date.today - days).strftime('%Y-%m-%d')
+    "/projects/#{@project.identifier}/issues?set_filter=1&f%5B%5D=status_id&op%5Bstatus_id%5D=o&f%5B%5D=updated_on&op%5Bupdated_on%5D=%3C%3D&v%5Bupdated_on%5D%5B%5D=#{date}&sort=updated_on%3Aasc"
+  }
+%>
 
 <div class="stats-cards">
   <div class="stats-card orange">
-    <div class="number"><%= stale_summary["stale_30d"] || 0 %></div>
-    <div class="label">Idle 30+ days</div>
+    <a href="<%= stale_url.call(30) %>" style="text-decoration:none;color:inherit;">
+      <div class="number"><%= stale_summary["stale_30d"] || 0 %></div>
+      <div class="label">Idle 30+ days</div>
+    </a>
   </div>
   <div class="stats-card red">
-    <div class="number"><%= stale_summary["stale_90d"] || 0 %></div>
-    <div class="label">Idle 90+ days</div>
+    <a href="<%= stale_url.call(90) %>" style="text-decoration:none;color:inherit;">
+      <div class="number"><%= stale_summary["stale_90d"] || 0 %></div>
+      <div class="label">Idle 90+ days</div>
+    </a>
   </div>
   <div class="stats-card red">
-    <div class="number"><%= stale_summary["stale_180d"] || 0 %></div>
-    <div class="label">Idle 6+ months</div>
+    <a href="<%= stale_url.call(180) %>" style="text-decoration:none;color:inherit;">
+      <div class="number"><%= stale_summary["stale_180d"] || 0 %></div>
+      <div class="label">Idle 6+ months</div>
+    </a>
   </div>
   <div class="stats-card red">
-    <div class="number"><%= stale_summary["stale_1y"] || 0 %></div>
-    <div class="label">Idle 1+ year</div>
+    <a href="<%= stale_url.call(365) %>" style="text-decoration:none;color:inherit;">
+      <div class="number"><%= stale_summary["stale_1y"] || 0 %></div>
+      <div class="label">Idle 1+ year</div>
+    </a>
   </div>
 </div>
 
