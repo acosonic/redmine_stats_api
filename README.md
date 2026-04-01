@@ -8,6 +8,7 @@ Ticket statistics dashboard and JSON API for Redmine, with daily file-based cach
 - **JSON API** — global and per-project endpoints with token auth
 - **24-hour caching** — file-based, no extra dependencies
 - **Charts** — monthly trend and day-of-week bar charts (Chart.js)
+- **High conversation detection** — flags open tickets with above-average updates/comments
 
 ## Compatibility
 
@@ -63,6 +64,7 @@ Both return:
 - **monthly_trend** — created vs closed per month (last 12 months)
 - **by_day_of_week** — ticket volume per weekday (last 12 months)
 - **oldest_open** — 10 oldest open tickets
+- **high_conversation** — open tickets with above-average comment/update counts (avg + 1 stddev, minimum threshold of 2), including assignee, update count, age, and last update date
 
 ## Authentication
 
