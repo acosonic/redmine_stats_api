@@ -39,7 +39,8 @@ module StatsQueries
       monthly_trend: monthly_trend,
       by_day_of_week: by_day_of_week,
       oldest_open: oldest_open,
-      high_conversation: high_conversation
+      high_conversation: high_conversation,
+      stale_tickets: stale_tickets
     }
   end
 
@@ -60,7 +61,8 @@ module StatsQueries
       monthly_trend: monthly_trend(w),
       by_day_of_week: by_day_of_week(w),
       oldest_open: oldest_open(w),
-      high_conversation: high_conversation(w)
+      high_conversation: high_conversation(w),
+      stale_tickets: stale_tickets(w)
     }
   end
 
@@ -243,6 +245,46 @@ module StatsQueries
     {
       avg_updates: avg_row["avg_updates"],
       threshold: threshold,
+      count: tickets.size,
+      tickets: tickets
+    }
+  end
+
+  def stale_tickets(where = "1=1")
+    # Open tickets with no activity for 30+ days
+    summary = db.select_one(
+      "SELECT" \
+      " SUM(CASE WHEN DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) >= 30 THEN 1 ELSE 0 END) AS stale_30d," \
+      " SUM(CASE WHEN DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) >= 90 THEN 1 ELSE 0 END) AS stale_90d," \
+      " SUM(CASE WHEN DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) >= 180 THEN 1 ELSE 0 END) AS stale_180d," \
+      " SUM(CASE WHEN DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) >= 365 THEN 1 ELSE 0 END) AS stale_1y" \
+      " FROM issues i" \
+      " JOIN issue_statuses s ON i.status_id = s.id" \
+      " LEFT JOIN (SELECT journalized_id, MAX(created_on) AS last_j FROM journals WHERE journalized_type = 'Issue' GROUP BY journalized_id) jj ON jj.journalized_id = i.id" \
+      " WHERE s.is_closed = 0 AND #{where}"
+    )
+
+    tickets = db.select_all(
+      "SELECT i.id, p.name AS project, t.name AS tracker," \
+      " i.subject, s.name AS status," \
+      " COALESCE(CONCAT(u.firstname, ' ', u.lastname), 'Unassigned') AS assignee," \
+      " DATE(i.created_on) AS created," \
+      " DATE(COALESCE(last_j, i.updated_on, i.created_on)) AS last_activity," \
+      " DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) AS idle_days," \
+      " DATEDIFF(NOW(), i.created_on) AS age_days" \
+      " FROM issues i" \
+      " JOIN projects p ON i.project_id = p.id" \
+      " JOIN trackers t ON i.tracker_id = t.id" \
+      " JOIN issue_statuses s ON i.status_id = s.id" \
+      " LEFT JOIN users u ON i.assigned_to_id = u.id" \
+      " LEFT JOIN (SELECT journalized_id, MAX(created_on) AS last_j FROM journals WHERE journalized_type = 'Issue' GROUP BY journalized_id) jj ON jj.journalized_id = i.id" \
+      " WHERE s.is_closed = 0 AND DATEDIFF(NOW(), COALESCE(last_j, i.updated_on, i.created_on)) >= 30 AND #{where}" \
+      " ORDER BY idle_days DESC" \
+      " LIMIT 25"
+    ).to_a
+
+    {
+      summary: summary,
       count: tickets.size,
       tickets: tickets
     }

@@ -200,6 +200,56 @@
 </div>
 <% end %>
 
+<% stale = @stats[:stale_tickets] || @stats["stale_tickets"] || {} %>
+<% stale_summary = stale["summary"] || {} %>
+<% stale_tickets = stale["tickets"] || [] %>
+
+<div class="stats-cards">
+  <div class="stats-card orange">
+    <div class="number"><%= stale_summary["stale_30d"] || 0 %></div>
+    <div class="label">Idle 30+ days</div>
+  </div>
+  <div class="stats-card red">
+    <div class="number"><%= stale_summary["stale_90d"] || 0 %></div>
+    <div class="label">Idle 90+ days</div>
+  </div>
+  <div class="stats-card red">
+    <div class="number"><%= stale_summary["stale_180d"] || 0 %></div>
+    <div class="label">Idle 6+ months</div>
+  </div>
+  <div class="stats-card red">
+    <div class="number"><%= stale_summary["stale_1y"] || 0 %></div>
+    <div class="label">Idle 1+ year</div>
+  </div>
+</div>
+
+<% if stale_tickets.any? %>
+<div class="stats-grid">
+  <div class="stats-panel stats-full">
+    <h3>Stale Tickets (open, no activity for 30+ days)</h3>
+    <table>
+      <tr>
+        <th>ID</th><th>Tracker</th><th>Subject</th><th>Status</th>
+        <th>Assignee</th><th class="stats-num">Idle</th>
+        <th class="stats-num">Age</th><th>Last Activity</th>
+      </tr>
+      <% stale_tickets.each do |r| %>
+      <tr>
+        <td><%= link_to "##{r['id']}", issue_path(r['id']) %></td>
+        <td><%= r["tracker"] %></td>
+        <td><%= truncate(r["subject"].to_s, length: 55) %></td>
+        <td><%= r["status"] %></td>
+        <td><%= r["assignee"] %></td>
+        <td class="stats-num"><strong><%= number_with_delimiter(r["idle_days"]) %>d</strong></td>
+        <td class="stats-num"><%= number_with_delimiter(r["age_days"]) %>d</td>
+        <td><%= r["last_activity"] %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+</div>
+<% end %>
+
 <div class="stats-meta">
   Generated: <%= @stats[:generated_at] || @stats["generated_at"] %> &mdash;
   Cached for <%= (@stats[:cache_ttl_seconds] || @stats["cache_ttl_seconds"]).to_i / 3600 %> hours
