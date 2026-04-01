@@ -1,6 +1,13 @@
 # Redmine Stats API Plugin
 
-A Redmine plugin that exposes ticket statistics as a JSON API with daily file-based caching.
+Ticket statistics dashboard and JSON API for Redmine, with daily file-based caching.
+
+## Features
+
+- **Project module** — "Statistics" tab in the project menu, toggleable on/off per project
+- **JSON API** — global and per-project endpoints with token auth
+- **24-hour caching** — file-based, no extra dependencies
+- **Charts** — monthly trend and day-of-week bar charts (Chart.js)
 
 ## Compatibility
 
@@ -19,28 +26,21 @@ touch /path/to/redmine/tmp/restart.txt   # restart Passenger
 
 No migrations required.
 
-## Endpoints
+## Enabling the Statistics Module
+
+1. Go to **Administration > Roles and Permissions**
+2. Check **"View project statistics"** for the roles that should see stats
+3. Go to **Project > Settings > Modules**
+4. Enable **"Statistics"**
+5. The "Statistics" tab now appears in the project menu
+
+## JSON API
 
 ### Global Statistics
 
 ```
 GET /stats_api?token=YOUR_TOKEN
 ```
-
-Returns:
-
-- **overall** — total, open, closed, close rate
-- **recent** — tickets created today, this week, this month
-- **overdue** — count of open tickets past due date
-- **resolution_time** — avg/min/max days to close (last 12 months)
-- **by_status** — ticket counts per status
-- **by_tracker** — totals per tracker (Bug, Feature, Support, Task)
-- **by_priority** — totals per priority level
-- **by_project** — top 30 projects by volume
-- **by_assignee** — top 20 assignees by open ticket count
-- **monthly_trend** — created vs closed per month (last 12 months)
-- **by_day_of_week** — ticket volume per weekday (last 12 months)
-- **oldest_open** — 10 oldest open tickets
 
 ### Per-Project Statistics
 
@@ -49,59 +49,47 @@ GET /stats_api/project/:identifier?token=YOUR_TOKEN
 GET /stats_api/project/:id?token=YOUR_TOKEN
 ```
 
-Returns the same breakdown scoped to a single project (excludes `by_project`).
+Both return:
+
+- **overall** — total, open, closed, close rate
+- **recent** — tickets created today, this week, this month
+- **overdue** — count of open tickets past due date
+- **resolution_time** — avg/min/max days to close (last 12 months)
+- **by_status** — ticket counts per status
+- **by_tracker** — totals per tracker (Bug, Feature, Support, Task)
+- **by_priority** — totals per priority level
+- **by_project** — top 30 projects by volume (global only)
+- **by_assignee** — top 20 assignees by open ticket count
+- **monthly_trend** — created vs closed per month (last 12 months)
+- **by_day_of_week** — ticket volume per weekday (last 12 months)
+- **oldest_open** — 10 oldest open tickets
 
 ## Authentication
 
-Requests require a `token` query parameter. The default token is set in `init.rb` and can be changed via:
-
-**Administration > Plugins > Redmine Stats API > Settings**
+- **UI**: uses Redmine's built-in auth and role permissions
+- **API**: requires a `token` query parameter (default set in `init.rb`, changeable via Administration > Plugins)
 
 ## Caching
 
 - Responses are cached as JSON files in `tmp/stats_api_cache/`
-- Cache TTL: **24 hours** (configurable via `CACHE_TTL` in the controller)
-- Global and per-project caches are independent
-- To force a refresh, delete the cache files:
+- Cache TTL: **24 hours** (configurable via `CACHE_TTL` in `lib/stats_queries.rb`)
+- Global, API per-project, and UI per-project caches are independent
+- To force a refresh:
 
 ```bash
 rm -f /path/to/redmine/tmp/stats_api_cache/*.json
-```
-
-## Example Response
-
-```json
-{
-  "generated_at": "2026-04-01 12:43:47",
-  "cache_ttl_seconds": 86400,
-  "overall": {
-    "total": 277595,
-    "open": 14805,
-    "closed": 262790,
-    "close_rate": "94.7"
-  },
-  "recent": {
-    "today": 95,
-    "this_week": 335,
-    "this_month": 95
-  },
-  "overdue": 22,
-  "resolution_time": {
-    "avg_days": "15.0",
-    "min_days": "0.0",
-    "max_days": "791.0",
-    "sample_size": 84540
-  }
-}
 ```
 
 ## File Structure
 
 ```
 redmine_stats_api/
-├── init.rb                              # Plugin registration
-├── config/routes.rb                     # Route definitions
-├── app/controllers/stats_api_controller.rb  # All logic + caching
+├── init.rb                                        # Plugin registration, module, menu
+├── config/routes.rb                               # Route definitions
+├── lib/stats_queries.rb                           # Shared query logic + caching
+├── app/controllers/stats_api_controller.rb        # JSON API (token auth)
+├── app/controllers/project_stats_controller.rb    # UI controller (Redmine auth)
+├── app/views/project_stats/show.html.erb          # Dashboard view with charts
 └── README.md
 ```
 

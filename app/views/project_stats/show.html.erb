@@ -1,0 +1,217 @@
+<% content_for :header_tags do %>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  .stats-cards { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .stats-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 15px 20px; text-align: center; min-width: 120px; flex: 1; }
+  .stats-card .number { font-size: 28px; font-weight: 700; color: #333; }
+  .stats-card .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .stats-card.green .number { color: #27ae60; }
+  .stats-card.red .number { color: #c0392b; }
+  .stats-card.blue .number { color: #2980b9; }
+  .stats-card.orange .number { color: #d35400; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+  .stats-panel { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 15px; }
+  .stats-panel h3 { font-size: 13px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+  .stats-panel table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .stats-panel th { text-align: left; padding: 5px 8px; background: #f9f9f9; color: #666; font-size: 11px; text-transform: uppercase; }
+  .stats-panel td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+  .stats-panel tr:hover td { background: #f9f9f9; }
+  .stats-num { text-align: right; font-variant-numeric: tabular-nums; }
+  .stats-chart { height: 250px; position: relative; }
+  .stats-full { grid-column: 1 / -1; }
+  .stats-meta { text-align: right; font-size: 11px; color: #aaa; margin-top: 10px; }
+  @media (max-width: 900px) { .stats-grid { grid-template-columns: 1fr; } }
+</style>
+<% end %>
+
+<h2>Statistics: <%= @project.name %></h2>
+
+<% overall = @stats[:overall] || @stats["overall"] %>
+<% recent = @stats[:recent] || @stats["recent"] %>
+<% overdue = @stats[:overdue] || @stats["overdue"] %>
+<% res = @stats[:resolution_time] || @stats["resolution_time"] %>
+
+<div class="stats-cards">
+  <div class="stats-card">
+    <div class="number"><%= number_with_delimiter(overall["total"]) %></div>
+    <div class="label">Total</div>
+  </div>
+  <div class="stats-card red">
+    <div class="number"><%= number_with_delimiter(overall["open"]) %></div>
+    <div class="label">Open</div>
+  </div>
+  <div class="stats-card green">
+    <div class="number"><%= overall["close_rate"] %>%</div>
+    <div class="label">Close Rate</div>
+  </div>
+  <div class="stats-card orange">
+    <div class="number"><%= overdue %></div>
+    <div class="label">Overdue</div>
+  </div>
+  <div class="stats-card blue">
+    <div class="number"><%= res["avg_days"] || "N/A" %></div>
+    <div class="label">Avg Days to Close</div>
+  </div>
+  <div class="stats-card">
+    <div class="number"><%= recent["today"] || 0 %></div>
+    <div class="label">Today</div>
+  </div>
+  <div class="stats-card">
+    <div class="number"><%= recent["this_week"] || 0 %></div>
+    <div class="label">This Week</div>
+  </div>
+  <div class="stats-card">
+    <div class="number"><%= recent["this_month"] || 0 %></div>
+    <div class="label">This Month</div>
+  </div>
+</div>
+
+<% monthly = @stats[:monthly_trend] || @stats["monthly_trend"] || [] %>
+<% by_day = @stats[:by_day_of_week] || @stats["by_day_of_week"] || [] %>
+
+<div class="stats-grid">
+  <div class="stats-panel">
+    <h3>Monthly Trend (12 Months)</h3>
+    <div class="stats-chart"><canvas id="monthlyChart"></canvas></div>
+  </div>
+  <div class="stats-panel">
+    <h3>By Day of Week</h3>
+    <div class="stats-chart"><canvas id="dayChart"></canvas></div>
+  </div>
+</div>
+
+<% statuses = @stats[:by_status] || @stats["by_status"] || [] %>
+<% trackers = @stats[:by_tracker] || @stats["by_tracker"] || [] %>
+<% priorities = @stats[:by_priority] || @stats["by_priority"] || [] %>
+<% assignees = @stats[:by_assignee] || @stats["by_assignee"] || [] %>
+<% oldest = @stats[:oldest_open] || @stats["oldest_open"] || [] %>
+
+<div class="stats-grid">
+  <div class="stats-panel">
+    <h3>By Status</h3>
+    <table>
+      <tr><th>Status</th><th class="stats-num">Count</th></tr>
+      <% statuses.each do |r| %>
+      <tr>
+        <td><%= r["status"] %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["count"]) %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+  <div class="stats-panel">
+    <h3>By Tracker</h3>
+    <table>
+      <tr><th>Tracker</th><th class="stats-num">Total</th><th class="stats-num">Open</th><th class="stats-num">Closed</th></tr>
+      <% trackers.each do |r| %>
+      <tr>
+        <td><%= r["tracker"] %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["total"]) %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["open"]) %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["closed"]) %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stats-panel">
+    <h3>By Priority</h3>
+    <table>
+      <tr><th>Priority</th><th class="stats-num">Total</th><th class="stats-num">Open</th></tr>
+      <% priorities.each do |r| %>
+      <tr>
+        <td><%= r["priority"] %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["total"]) %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["open"]) %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+  <div class="stats-panel">
+    <h3>Resolution Time (12 Months)</h3>
+    <table>
+      <tr><th>Metric</th><th class="stats-num">Value</th></tr>
+      <tr><td>Average</td><td class="stats-num"><%= res["avg_days"] || "N/A" %> days</td></tr>
+      <tr><td>Fastest</td><td class="stats-num"><%= res["min_days"] || "N/A" %> days</td></tr>
+      <tr><td>Slowest</td><td class="stats-num"><%= res["max_days"] || "N/A" %> days</td></tr>
+      <tr><td>Sample size</td><td class="stats-num"><%= number_with_delimiter(res["sample_size"]) %></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stats-panel">
+    <h3>Assignee Workload</h3>
+    <table>
+      <tr><th>Assignee</th><th class="stats-num">Total</th><th class="stats-num">Open</th></tr>
+      <% assignees.each do |r| %>
+      <tr>
+        <td><%= r["assignee"] %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["total"]) %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["open"]) %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+  <div class="stats-panel">
+    <h3>Oldest Open Tickets</h3>
+    <table>
+      <tr><th>ID</th><th>Tracker</th><th>Subject</th><th class="stats-num">Age</th></tr>
+      <% oldest.each do |r| %>
+      <tr>
+        <td><%= link_to "##{r['id']}", issue_path(r['id']) %></td>
+        <td><%= r["tracker"] %></td>
+        <td><%= truncate(r["subject"].to_s, length: 50) %></td>
+        <td class="stats-num"><%= number_with_delimiter(r["age_days"]) %>d</td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+</div>
+
+<div class="stats-meta">
+  Generated: <%= @stats[:generated_at] || @stats["generated_at"] %> &mdash;
+  Cached for <%= (@stats[:cache_ttl_seconds] || @stats["cache_ttl_seconds"]).to_i / 3600 %> hours
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  var labels = <%= raw (monthly.map { |m| m["month"] }).to_json %>;
+  var created = <%= raw (monthly.map { |m| m["created"].to_i }).to_json %>;
+  var closed = <%= raw (monthly.map { |m| m["closed_same_month"].to_i }).to_json %>;
+
+  new Chart(document.getElementById("monthlyChart"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        { label: "Created", data: created, backgroundColor: "rgba(231,76,60,0.7)", borderRadius: 3 },
+        { label: "Closed", data: closed, backgroundColor: "rgba(39,174,96,0.7)", borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12 } } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  var dayLabels = <%= raw (by_day.map { |d| d["day"] }).to_json %>;
+  var dayCounts = <%= raw (by_day.map { |d| d["count"].to_i }).to_json %>;
+
+  new Chart(document.getElementById("dayChart"), {
+    type: "bar",
+    data: {
+      labels: dayLabels,
+      datasets: [{ label: "Tickets", data: dayCounts, backgroundColor: "rgba(41,128,185,0.7)", borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+});
+</script>
